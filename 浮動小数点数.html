@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IEEE 754 単精度浮動小数点変換ツール</title>
+  <style>
+    /* Global Styles */
+    body {
+      background: #e0f7fa;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    h1 {
+      text-align: center;
+      color: #00796b;
+      margin-bottom: 20px;
+    }
+    .input-section {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .input-section input {
+      font-size: 1.2em;
+      padding: 8px 12px;
+      width: 250px;
+      border: 2px solid #00796b;
+      border-radius: 5px;
+      margin-right: 10px;
+    }
+    .input-section button {
+      font-size: 1.2em;
+      padding: 8px 16px;
+      background-color: #00796b;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .input-section button:hover {
+      background-color: #004d40;
+    }
+    
+    /* Conversion Block (10進法→2進法) – ラベルにマーカーを追加 */
+    .conversion {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 30px;
+    }
+    .conversion .box {
+      display: inline-block;
+      padding: 15px 25px;
+      margin: 10px;
+      border-radius: 8px;
+      background: #fafafa;
+      box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+    }
+    .conversion .label {
+      font-weight: bold;
+      margin-bottom: 5px;
+      display: block;
+      text-align: center;
+    }
+    .conversion .value {
+      font-size: 1.3em;
+      text-align: center;
+    }
+    /* マーカー用（ラベル部分に適用） */
+    .marker-decimal {
+      background-color: #ffffcc;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .marker-binary {
+      background-color: #ccffcc;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .arrow {
+      font-size: 2em;
+      margin: 0 10px;
+      align-self: center;
+    }
+    
+    /* Normalized Floating-Point Display – 1行表示、改行追加 */
+    .normalized {
+      text-align: center;
+      margin-top: 30px;
+    }
+    .normalized .label {
+      background-color: #A5D6A7;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      display: inline-block;
+      font-size: 1.5em;
+    }
+    .normalized-value {
+      font-size: 2em;
+      display: inline-block;
+    }
+    .norm-sign {
+      border: 2px solid red;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-right: 5px;
+    }
+    .norm-mantissa {
+      border: 2px solid green;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-right: 5px;
+    }
+    .norm-exponent {
+      border: 1px solid blue;
+      padding: 2px 4px;
+      border-radius: 4px;
+      display: inline-block;
+      font-size: 0.8em;
+    }
+    
+    /* 32-bit Grid Display – セルの縦幅を小さく調整 */
+    .bit-grid {
+      display: grid;
+      grid-template-columns: repeat(32, 1fr);
+      gap: 2px;
+      margin: 30px auto;
+      max-width: 100%;
+    }
+    .bit-cell {
+      border: 1px solid #999;
+      text-align: center;
+      padding: 5px 0; /* 縦の余白を小さく */
+      font-size: 2em;
+      font-weight: bold;
+    }
+    .cell-sign {
+      background-color: #ffcccc;
+    }
+    .cell-exponent {
+      background-color: #cceeff;
+    }
+    .cell-mantissa {
+      background-color: #ccffcc;
+    }
+    
+    /* Explanations – 各部の説明（縦に3列）、符号部に上部余白 */
+    .bit-descriptions {
+      margin-top: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .desc {
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      font-size: 1.1em;
+      line-height: 1.5;
+    }
+    .sign-desc {
+      background-color: #ffcccc;
+      margin-top: 20px; /* 上部に余白を追加 */
+    }
+    .exponent-desc {
+      background-color: #cceeff;
+    }
+    .mantissa-desc {
+      background-color: #ccffcc;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>IEEE 754 単精度浮動小数点変換ツール</h1>
+    <div class="input-section">
+      <label for="decimalInput">10進法を入力してください：</label>
+      <input type="text" id="decimalInput" placeholder="例: 2.5">
+      <button id="convertBtn">変換</button>
+    </div>
+    <div id="result">
+      <!-- 結果表示エリア -->
+    </div>
+  </div>
+  
+  <script>
+    // 10進数の整数部と小数部を2進数に変換（小数部は最大23ビットまで）
+    function decimalToBinary(num) {
+      const integerPart = Math.floor(num);
+      let fractionPart = num - integerPart;
+      const intStr = integerPart.toString(2);
+      let fracStr = "";
+      let limit = 23;
+      while(limit > 0) {
+        fractionPart *= 2;
+        const bit = Math.floor(fractionPart);
+        fracStr += bit;
+        fractionPart -= bit;
+        limit--;
+        if(fractionPart === 0) break;
+      }
+      if(fracStr === "") { fracStr = "0"; }
+      return intStr + "." + fracStr;
+    }
+    
+    // 正規化：2進数文字列（例："10.1"）を 1.xxx×2^e の形に
+    function normalizeBinary(binaryStr) {
+      const [intStr, fracStr] = binaryStr.split('.');
+      if(parseInt(intStr, 2) !== 0) {
+        const exponent = intStr.length - 1;
+        const mantissa = intStr[0] + "." + intStr.slice(1) + fracStr;
+        return { mantissa, exponent };
+      } else {
+        const firstOneIndex = fracStr.indexOf('1');
+        if(firstOneIndex === -1) {
+          return { mantissa: "0.0", exponent: 0 };
+        }
+        const exponent = -(firstOneIndex + 1);
+        const mantissa = "1." + fracStr.slice(firstOneIndex + 1);
+        return { mantissa, exponent };
+      }
+    }
+    
+    // 入力値をIEEE 754 単精度（32ビット）の各部に分解
+    function getIEEE754(num) {
+      const signBit = num < 0 ? "1" : "0";
+      if(num === 0) {
+        return {
+          sign: signBit,
+          exponent: "00000000",
+          mantissa: "00000000000000000000000",
+          normalized: { mantissa: "0.0", exponent: 0 },
+          binaryStr: "0.0",
+          exponentValue: 0
+        };
+      }
+      const absVal = Math.abs(num);
+      const binaryStr = decimalToBinary(absVal);
+      const normalized = normalizeBinary(binaryStr);
+      const exponentValue = normalized.exponent + 127;
+      let exponentBits = exponentValue.toString(2);
+      exponentBits = "0".repeat(8 - exponentBits.length) + exponentBits;
+      const fractionPart = normalized.mantissa.split('.')[1] || "";
+      const mantissaBits = (fractionPart + "0".repeat(23)).substring(0,23);
+      return {
+        sign: signBit,
+        exponent: exponentBits,
+        mantissa: mantissaBits,
+        normalized,
+        binaryStr,
+        exponentValue
+      };
+    }
+    
+    document.getElementById("convertBtn").addEventListener("click", function() {
+      const inputVal = document.getElementById("decimalInput").value;
+      const num = parseFloat(inputVal);
+      if(isNaN(num)) {
+        alert("正しい数値を入力してください。");
+        return;
+      }
+      
+      const ieee = getIEEE754(num);
+      const signDisplay = num < 0 ? "−" : "+";
+      
+      // (1) 10進法→2進法変換ブロック（ラベルにマーカーを適用）
+      let resultHTML = `
+        <div class="conversion">
+          <div class="box">
+            <span class="label marker-decimal">10進法</span>
+            <span class="value">${num}</span>
+          </div>
+          <div class="arrow">⇒</div>
+          <div class="box">
+            <span class="label marker-binary">2進法</span>
+            <span class="value">${ieee.binaryStr}</span>
+          </div>
+        </div>
+      `;
+      
+      // (2) 2進法の浮動小数点数（正規化）の表示（1行表示、改行追加）
+      resultHTML += `
+        <div class="normalized">
+          <div class="label">2進法の浮動小数点数（正規化）</div>
+          <br>
+          <div class="normalized-value">
+            <span class="norm-sign" title="符号部">${signDisplay}</span>
+            <span class="norm-mantissa" title="仮数部">${ieee.normalized.mantissa}</span>
+            <span>× 2<sup><span class="norm-exponent" title="指数部">${ieee.normalized.exponent}</span></sup></span>
+          </div>
+        </div>
+      `;
+      
+      // (3) IEEE 754 形式の32ビット表示（1桁ずつマス目に）
+      const bitString = ieee.sign + ieee.exponent + ieee.mantissa;  // 全32桁
+      let bitGridHTML = '<div class="bit-grid">';
+      for(let i = 0; i < bitString.length; i++){
+        let cellClass = "bit-cell";
+        if(i === 0) {
+          cellClass += " cell-sign";
+        } else if(i >= 1 && i <= 8) {
+          cellClass += " cell-exponent";
+        } else {
+          cellClass += " cell-mantissa";
+        }
+        bitGridHTML += `<div class="${cellClass}">${bitString[i]}</div>`;
+      }
+      bitGridHTML += '</div>';
+      
+      // (4) 各部の説明（縦に3列）
+      const explanationsHTML = `
+        <div class="bit-descriptions">
+          <div class="desc sign-desc">
+            <strong>符号部 (1ビット):</strong><br>
+            正の値のとき「0」、負の値のとき「1」を記録します。<br>
+            今回の場合は， ${num} は ${num < 0 ? "負" : "正"} の値なので， <strong>${ieee.sign}</strong> を記録します.
+          </div>
+          <div class="desc exponent-desc">
+            <strong>指数部 (8ビット):</strong><br>
+            負の指数も扱えるようにするため，指数に127を加えて正の数にします。（これにより -126～+127 が扱えます）<br>
+            その値を2進数に変換し，8ビットで記録します。<br>
+            今回の場合は，正規化指数 <strong>${ieee.normalized.exponent}</strong> に 127 を加えた <strong>${ieee.normalized.exponent} + 127 = ${ieee.exponentValue}</strong> を8ビットの2進数に直した <strong>${ieee.exponent}</strong> を記録します.
+          </div>
+          <div class="desc mantissa-desc">
+            <strong>仮数部 (23ビット):</strong><br>
+            整数部は正規化により常に1となるので省略し，小数部分を左詰めで格納します。<br>
+            今回の場合は，正規化された仮数 <strong>${ieee.normalized.mantissa}</strong> の小数部分 <strong>${ieee.normalized.mantissa.split('.')[1]}</strong> を取得し、
+            これに必要な0を右側に追加して23ビットに調整した結果、最終的に <strong>${ieee.mantissa}</strong> を記録します.
+          </div>
+        </div>
+      `;
+      
+      resultHTML += `
+        <div class="ieee">
+          ${bitGridHTML}
+          ${explanationsHTML}
+        </div>
+      `;
+      
+      document.getElementById("result").innerHTML = resultHTML;
+    });
+  </script>
+</body>
+</html>
